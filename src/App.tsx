@@ -1,5 +1,5 @@
 import './App.css'
-import CesiumGlobe from './assets/Components/Cesiumglobe'
+import CesiumGlobe from './assets/Components/CesiumGlobe'
 
 function App() {
 
