@@ -1,4 +1,5 @@
-import { Viewer, Cartesian3, Color } from 'cesium';
+import { Viewer } from 'cesium';
+// import { Cartesian3, Color} from 'cesium';}
 import React, { useEffect, useRef } from 'react';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import './CesiumGlobe.css';
@@ -14,6 +15,7 @@ const CesiumGlobe: React.FC = () => {
         // ...tus opciones de configuración...
       });
 
+      /*
       // --- INICIO DE CÓDIGO NUEVO ---
 
       // Coordenadas de Santo Domingo (longitud, latitud)
@@ -38,7 +40,7 @@ const CesiumGlobe: React.FC = () => {
         },
       });
 
-      // --- FIN DE CÓDIGO NUEVO ---
+      viewer.flyTo(santoDomingoPoint); */
     }
 
     return () => {
