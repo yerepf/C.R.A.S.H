@@ -178,7 +178,7 @@ const CesiumGlobe: React.FC = () => {
       {selectedAsteroid && (
         <button
           className="crash-button"
-          onClick={() => alert(`💥 Impacto de ${selectedAsteroid.name} simulado!`)}
+          onClick={() => window.alert(`💥 Impacto de ${selectedAsteroid.name} simulado!`)}
         >
           🚀 CRASH
         </button>
