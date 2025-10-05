@@ -46,9 +46,52 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       center: [impactData.lon, impactData.lat],
-      zoom: 11,
-      pitch: 65,
+      zoom: 15,
+      pitch: 60,
       bearing: -20
+    });
+
+    // Habilitar edificios 3D
+    mapRef.current.on('load', () => {
+      const layers = mapRef.current!.getStyle().layers;
+      const labelLayerId = layers?.find(
+        (layer: any) => layer.type === 'symbol' && layer.layout['text-field']
+      )?.id;
+
+      // Agregar capa de edificios 3D
+      mapRef.current!.addLayer(
+        {
+          id: 'add-3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          filter: ['==', 'extrude', 'true'],
+          type: 'fill-extrusion',
+          minzoom: 15,
+          paint: {
+            'fill-extrusion-color': '#aaa',
+            'fill-extrusion-height': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              15,
+              0,
+              15.05,
+              ['get', 'height']
+            ],
+            'fill-extrusion-base': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              15,
+              0,
+              15.05,
+              ['get', 'min_height']
+            ],
+            'fill-extrusion-opacity': 0.6
+          }
+        },
+        labelLayerId
+      );
     });
 
     return () => {
@@ -60,44 +103,137 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
   // Mostrar cráter después de la animación
   useEffect(() => {
     if (animationComplete && mapRef.current) {
-      // Marcador rojo en el punto de impacto
-      new mapboxgl.Marker({ color: '#ff0000', scale: 1.5 })
-        .setLngLat([impactData.lon, impactData.lat])
-        .addTo(mapRef.current);
+      const map = mapRef.current;
 
-      // Círculo del cráter
-      const craterRadiusKm = parseFloat(impactCalculations.crater.diameter) / 2000;
+      // Calcular radio del cráter en metros
+      const craterRadiusMeters = parseFloat(impactCalculations.crater.diameter) / 2;
       
-      mapRef.current.addSource('crater', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [impactData.lon, impactData.lat]
-          },
-          properties: {}
-        }
-      });
+      // Crear el cráter como un polígono circular
+      const createCircle = (center: [number, number], radiusInMeters: number, points: number = 64) => {
+        const coords = [];
+        const distanceX = radiusInMeters / (111320 * Math.cos(center[1] * Math.PI / 180));
+        const distanceY = radiusInMeters / 110574;
 
-      mapRef.current.addLayer({
-        id: 'crater-circle',
-        type: 'circle',
-        source: 'crater',
-        paint: {
-          'circle-radius': {
-            stops: [
-              [0, 0],
-              [20, craterRadiusKm * 100000]
-            ],
-            base: 2
-          },
-          'circle-color': '#ff0000',
-          'circle-opacity': 0.3,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ff0000'
+        for (let i = 0; i < points; i++) {
+          const theta = (i / points) * (2 * Math.PI);
+          const x = distanceX * Math.cos(theta);
+          const y = distanceY * Math.sin(theta);
+          coords.push([center[0] + x, center[1] + y]);
         }
-      });
+        coords.push(coords[0]);
+        return coords;
+      };
+
+      // Esperar a que el mapa esté completamente cargado
+      if (map.isStyleLoaded()) {
+        addCraterLayers();
+      } else {
+        map.once('styledata', addCraterLayers);
+      }
+
+      function addCraterLayers() {
+        if (!map.getSource('crater-source')) {
+          // Agregar fuente del cráter
+          map.addSource('crater-source', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [createCircle([impactData.lon, impactData.lat], craterRadiusMeters)]
+              },
+              properties: {}
+            }
+          });
+
+          // Capa de relleno del cráter (oscuro)
+          map.addLayer({
+            id: 'crater-fill',
+            type: 'fill',
+            source: 'crater-source',
+            paint: {
+              'fill-color': '#1a0a00',
+              'fill-opacity': 0.8
+            }
+          });
+
+          // Borde interior del cráter (marrón oscuro)
+          map.addLayer({
+            id: 'crater-border-inner',
+            type: 'line',
+            source: 'crater-source',
+            paint: {
+              'line-color': '#3d1f00',
+              'line-width': 4,
+              'line-blur': 2
+            }
+          });
+
+          // Borde exterior del cráter (tierra removida)
+          map.addLayer({
+            id: 'crater-border-outer',
+            type: 'line',
+            source: 'crater-source',
+            paint: {
+              'line-color': '#8B4513',
+              'line-width': 8,
+              'line-blur': 4
+            }
+          });
+
+          // Agregar zona de devastación (radio 3x del cráter)
+          const devastationRadius = craterRadiusMeters * 3;
+          map.addSource('devastation-source', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [createCircle([impactData.lon, impactData.lat], devastationRadius)]
+              },
+              properties: {}
+            }
+          });
+
+          map.addLayer({
+            id: 'devastation-zone',
+            type: 'fill',
+            source: 'devastation-source',
+            paint: {
+              'fill-color': '#ff4400',
+              'fill-opacity': 0.15
+            }
+          });
+
+          map.addLayer({
+            id: 'devastation-border',
+            type: 'line',
+            source: 'devastation-source',
+            paint: {
+              'line-color': '#ff0000',
+              'line-width': 2,
+              'line-dasharray': [2, 2],
+              'line-opacity': 0.5
+            }
+          });
+
+          // Marcador en el centro del impacto
+          new mapboxgl.Marker({ 
+            color: '#ff0000',
+            scale: 1.2
+          })
+            .setLngLat([impactData.lon, impactData.lat])
+            .setPopup(
+              new mapboxgl.Popup({ offset: 25 })
+                .setHTML(`
+                  <h3 style="margin:0;color:#ff0000;">Punto de Impacto</h3>
+                  <p style="margin:5px 0;"><strong>Cráter:</strong> ${impactCalculations.crater.diameter}m</p>
+                  <p style="margin:5px 0;"><strong>Devastación:</strong> ${(devastationRadius * 2 / 1000).toFixed(2)}km</p>
+                `)
+            )
+            .addTo(map);
+        }
+      }
 
       setCraterVisible(true);
     }
@@ -265,8 +401,8 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
     const createExplosion = (scene: THREE.Scene, position: THREE.Vector3) => {
       const explosionGroup = new THREE.Group();
       
-      // Flash inicial blanco brillante
-      const flashGeometry = new THREE.SphereGeometry(3, 16, 16);
+      // Flash inicial blanco brillante más grande
+      const flashGeometry = new THREE.SphereGeometry(5, 16, 16);
       const flashMaterial = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
@@ -275,24 +411,29 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
       const flash = new THREE.Mesh(flashGeometry, flashMaterial);
       explosionGroup.add(flash);
       
-      // Ondas de explosión
-      for (let i = 0; i < 4; i++) {
-        const waveGeometry = new THREE.SphereGeometry(2 + i * 1.5, 24, 24);
-        const waveMaterial = new THREE.MeshBasicMaterial({
-          color: i === 0 ? 0xffff00 : i === 1 ? 0xffaa00 : i === 2 ? 0xff4400 : 0xff0000,
+      // Bola de fuego masiva (múltiples capas)
+      for (let i = 0; i < 6; i++) {
+        const fireballGeometry = new THREE.SphereGeometry(3 + i * 2, 32, 32);
+        const fireballMaterial = new THREE.MeshBasicMaterial({
+          color: i === 0 ? 0xffff00 : 
+                 i === 1 ? 0xffdd00 : 
+                 i === 2 ? 0xffaa00 : 
+                 i === 3 ? 0xff6600 : 
+                 i === 4 ? 0xff3300 : 0xff0000,
           transparent: true,
-          opacity: 0.9 - i * 0.15,
+          opacity: 0.9 - i * 0.1,
           side: THREE.DoubleSide
         });
-        const wave = new THREE.Mesh(waveGeometry, waveMaterial);
-        explosionGroup.add(wave);
+        const fireball = new THREE.Mesh(fireballGeometry, fireballMaterial);
+        explosionGroup.add(fireball);
       }
       
-      // Partículas de explosión
+      // Partículas de explosión masivas
       const debrisGeometry = new THREE.BufferGeometry();
-      const debrisCount = 1000;
+      const debrisCount = 3000;
       const debrisPositions = new Float32Array(debrisCount * 3);
       const debrisVelocities: THREE.Vector3[] = [];
+      const debrisColors = new Float32Array(debrisCount * 3);
       
       for (let i = 0; i < debrisCount; i++) {
         const i3 = i * 3;
@@ -300,64 +441,129 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
         debrisPositions[i3 + 1] = 0;
         debrisPositions[i3 + 2] = 0;
         
+        const speed = 0.5 + Math.random() * 2;
         const velocity = new THREE.Vector3(
-          (Math.random() - 0.5) * 2,
-          Math.random() * 1.5,
-          (Math.random() - 0.5) * 2
+          (Math.random() - 0.5) * speed,
+          Math.random() * speed * 0.8,
+          (Math.random() - 0.5) * speed
         );
         debrisVelocities.push(velocity);
+        
+        // Colores variados para las partículas
+        const colorChoice = Math.random();
+        if (colorChoice < 0.3) {
+          debrisColors[i3] = 1.0; debrisColors[i3 + 1] = 1.0; debrisColors[i3 + 2] = 0.0;
+        } else if (colorChoice < 0.6) {
+          debrisColors[i3] = 1.0; debrisColors[i3 + 1] = 0.5; debrisColors[i3 + 2] = 0.0;
+        } else {
+          debrisColors[i3] = 1.0; debrisColors[i3 + 1] = 0.0; debrisColors[i3 + 2] = 0.0;
+        }
       }
       
       debrisGeometry.setAttribute('position', new THREE.BufferAttribute(debrisPositions, 3));
+      debrisGeometry.setAttribute('color', new THREE.BufferAttribute(debrisColors, 3));
       
       const debrisMaterial = new THREE.PointsMaterial({
-        color: 0xff6600,
-        size: 0.2,
+        size: 0.3,
         transparent: true,
         opacity: 1,
+        vertexColors: true,
         blending: THREE.AdditiveBlending
       });
       const debris = new THREE.Points(debrisGeometry, debrisMaterial);
       explosionGroup.add(debris);
       
+      // Partículas de humo y polvo
+      const smokeGeometry = new THREE.BufferGeometry();
+      const smokeCount = 2000;
+      const smokePositions = new Float32Array(smokeCount * 3);
+      const smokeVelocities: THREE.Vector3[] = [];
+      
+      for (let i = 0; i < smokeCount; i++) {
+        const i3 = i * 3;
+        smokePositions[i3] = (Math.random() - 0.5) * 2;
+        smokePositions[i3 + 1] = 0;
+        smokePositions[i3 + 2] = (Math.random() - 0.5) * 2;
+        
+        const vel = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.3,
+          Math.random() * 0.5 + 0.2,
+          (Math.random() - 0.5) * 0.3
+        );
+        smokeVelocities.push(vel);
+      }
+      
+      smokeGeometry.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+      
+      const smokeMaterial = new THREE.PointsMaterial({
+        color: 0x444444,
+        size: 0.5,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.NormalBlending
+      });
+      const smoke = new THREE.Points(smokeGeometry, smokeMaterial);
+      explosionGroup.add(smoke);
+      
       explosionGroup.position.copy(position);
       scene.add(explosionGroup);
       
-      // Luz de la explosión
-      const explosionLight = new THREE.PointLight(0xff4400, 5, 200);
+      // Luz de la explosión más potente
+      const explosionLight = new THREE.PointLight(0xff4400, 10, 300);
       explosionLight.position.copy(position);
       scene.add(explosionLight);
       
-      // Animar explosión
+      // Luz ambiental naranja para simular el resplandor
+      const ambientGlow = new THREE.AmbientLight(0xff6600, 2);
+      scene.add(ambientGlow);
+      
+      // Animar explosión y onda expansiva
       let scale = 1;
       let frame = 0;
       const explosionAnimate = () => {
         frame++;
-        scale += 0.4;
+        scale += 0.5;
         
+        // Escalar la bola de fuego
         explosionGroup.children.forEach((child) => {
           if (child instanceof THREE.Mesh) {
             child.scale.set(scale, scale, scale);
             const material = child.material;
             if (material && typeof material === 'object' && 'opacity' in material) {
-              (material as THREE.MeshBasicMaterial).opacity -= 0.015;
+              (material as THREE.MeshBasicMaterial).opacity -= 0.012;
             }
           }
         });
         
-        // Animar partículas de escombros
-        const debrisPos = debrisGeometry.attributes.position.array;
+        // Animar partículas de escombros con física
+        const debrisPos = debrisGeometry.attributes.position.array as Float32Array;
         debrisVelocities.forEach((vel, i) => {
           const i3 = i * 3;
           debrisPos[i3] += vel.x;
           debrisPos[i3 + 1] += vel.y;
           debrisPos[i3 + 2] += vel.z;
-          vel.y -= 0.02; // Gravedad
+          vel.y -= 0.015;
+          vel.x *= 0.99;
+          vel.z *= 0.99;
         });
         debrisGeometry.attributes.position.needsUpdate = true;
         
-        // Fade de la luz
-        explosionLight.intensity -= 0.08;
+        // Animar humo ascendente
+        const smokePos = smokeGeometry.attributes.position.array as Float32Array;
+        smokeVelocities.forEach((vel, i) => {
+          const i3 = i * 3;
+          smokePos[i3] += vel.x;
+          smokePos[i3 + 1] += vel.y;
+          smokePos[i3 + 2] += vel.z;
+          vel.x *= 0.98;
+          vel.z *= 0.98;
+        });
+        smokeGeometry.attributes.position.needsUpdate = true;
+        smokeMaterial.opacity -= 0.003;
+        
+        // Fade de las luces
+        explosionLight.intensity -= 0.12;
+        ambientGlow.intensity -= 0.025;
         
         // Verificar si debe continuar la animación
         const firstChild = explosionGroup.children[0];
@@ -365,7 +571,7 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
         if (firstChild instanceof THREE.Mesh) {
           const mat = firstChild.material;
           if (mat && typeof mat === 'object' && 'opacity' in mat) {
-            shouldContinue = frame < 120 && (mat as THREE.MeshBasicMaterial).opacity > 0;
+            shouldContinue = frame < 150 && (mat as THREE.MeshBasicMaterial).opacity > 0;
           }
         }
         
@@ -374,6 +580,13 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
         } else {
           scene.remove(explosionGroup);
           scene.remove(explosionLight);
+          scene.remove(ambientGlow);
+          
+          // Limpiar geometrías
+          debrisGeometry.dispose();
+          debrisMaterial.dispose();
+          smokeGeometry.dispose();
+          smokeMaterial.dispose();
         }
       };
       explosionAnimate();
@@ -757,7 +970,8 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
           left: '380px',
           top: 0,
           width: 'calc(100% - 380px)',
-          height: '100%'
+          height: '100%',
+          visibility: animationComplete ? 'visible' : 'visible'
         }}
       />
 

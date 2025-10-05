@@ -101,10 +101,11 @@ const CesiumGlobe: React.FC<{
       const viewer = new Viewer(cesiumContainer.current, {
         animation: false,
         timeline: false,
-        infoBox: true,
         skyAtmosphere: false,
         skyBox: false,
-        creditContainer: document.createElement("div")
+        creditContainer: document.createElement("div"),
+        infoBox: false,
+        selectionIndicator: false,
       });
 
       viewer.scene.logarithmicDepthBuffer = true;
@@ -544,9 +545,95 @@ const CesiumGlobe: React.FC<{
           z-index: 9999;
           box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
+
+        .asteroid-info-panel {
+  position: fixed;
+  top: 90px;
+  right: 30px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 16px;
+  width: 320px;
+  z-index: 9999;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  font-family: 'Segoe UI', sans-serif;
+  border: 1px solid rgba(255,255,255,0.1);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.asteroid-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.asteroid-details p {
+  margin: 6px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.asteroid-details strong {
+  color: #a5b4fc;
+}
+
+.close-panel {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-panel:hover {
+  color: white;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
       `}</style>
 
       <div ref={cesiumContainer} className="cesium-container" />
+
+      {selectedAsteroid && (
+  <div className="asteroid-info-panel">
+    <h3 className="asteroid-title">
+      🪨 {selectedAsteroid?.properties?.asteroidData?._value?.nombre || selectedAsteroid.name || "Asteroide"}
+    </h3>
+
+    <div className="asteroid-details">
+      <p><strong>ID:</strong> {selectedAsteroid?.properties?.asteroidData?._value?.id || "—"}</p>
+      <p><strong>Diámetro:</strong> 
+        {" "}{(selectedAsteroid?.properties?.asteroidData?._value?.diametro_promedio_m || 0).toFixed(2)} m
+      </p>
+      <p><strong>Velocidad:</strong> 
+        {" "}{(selectedAsteroid?.properties?.asteroidData?._value?.velocidad_km_s || 0).toFixed(2)} km/s
+      </p>
+      <p><strong>Altura:</strong> 
+        {" "}{((selectedAsteroid?.properties?.asteroidData?._value?.altura_tierra_m || 0) / 1000).toFixed(2)} km
+      </p>
+      <p><strong>Inclinación:</strong> 
+        {" "}{(selectedAsteroid?.properties?.asteroidData?._value?.inclinacion || 0).toFixed(4)} rad 
+        {" "}({CesiumMath.toDegrees(selectedAsteroid?.properties?.asteroidData?._value?.inclinacion || 0).toFixed(2)}°)
+      </p>
+      <p><strong>Powered by: </strong> NASA</p>
+    </div>
+
+    <button className="close-panel" onClick={() => setSelectedAsteroid(null)}>✖</button>
+  </div>
+)}
+
 
       <div className="date-controls">
         <button 
