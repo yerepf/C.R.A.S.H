@@ -38,80 +38,84 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData, onBack 
     }
   };
 
-  const fetchMitigationRecommendations = async () => {
-    console.log('🚀 Iniciando llamada a AI...');
-    setIsLoadingMitigation(true);
-    setMitigationText(''); // Limpiar texto anterior
+const fetchMitigationRecommendations = async () => {
+  console.log('🚀 Simulando llamada a AI...');
+  setIsLoadingMitigation(true);
+  setMitigationText('');
+  
+  // Simular delay de red
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  const recomendaciones = [
+    `Para un impacto de magnitud ${impactCalculations.seismic.magnitude} Richter, se recomienda: 
+    1. Evacuación inmediata en radio de 50 km
+    2. Refugios subterráneos para población vulnerable
+    3. Sistema de alerta temprana sísmica
+    4. Plan de contingencia para infraestructura crítica`,
     
-    try {
-      const API_KEY = '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';
-      const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-      
-      const nombre = impactData.asteroid?.nombre || 'Asteroide Desconocido';
-      const diametro = impactData.asteroid?.diametro_promedio_m || 340;
-      const velocidad = impactData.asteroid?.velocidad_km_s || 18.5;
-      const magnitud = impactCalculations.seismic.magnitude;
-      const energia = impactCalculations.energy.megatons;
-      const radioVisible = (parseFloat(impactCalculations.crater.diameter) / 2000).toFixed(2);
-      const coordenadas = `${Math.abs(impactData.lat).toFixed(2)}° ${impactData.lat >= 0 ? 'N' : 'S'}, ${Math.abs(impactData.lon).toFixed(2)}° ${impactData.lon >= 0 ? 'E' : 'W'}`;
-
-      const prompt = `Dada la severidad del evento simulado, con una Magnitud de ${magnitud} Richter y la liberación de ${energia} megatones con una velocidad de ${velocidad} km/s por el impacto del ${nombre} (${diametro} m) cerca de ${coordenadas}, del cráter (${radioVisible} km) de radio visible. Créame un párrafo con recomendaciones técnicas de mitigación y protección hacia un impacto de esta magnitud. Sé conciso y enfócate en medidas prácticas y técnicas de seguridad.`;
-
-      console.log('📝 Prompt generado:', prompt);
-
-      const requestBody = {
-        model: "meta-llama/llama-3.2-3b-instruct:free",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      };
-
-      console.log('📦 Enviando petición...');
-
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.href,
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log('📡 Status de respuesta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error en respuesta:', errorText);
-        setIsLoadingMitigation(false);
-        setMitigationText('Error al cargar las recomendaciones. Verifica tu API key.');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('✅ Respuesta completa:', data);
-      
-      const generatedText = data.choices?.[0]?.message?.content || 'No se pudieron generar recomendaciones en este momento.';
-      console.log('📄 Texto generado:', generatedText);
-      console.log('📏 Longitud del texto:', generatedText.length);
-      
-      // Asegurarse de actualizar el estado correctamente
-      setMitigationText(generatedText);
-      setIsLoadingMitigation(false);
-      
-      console.log('✨ Estado actualizado - isLoading:', false, '- texto:', generatedText.substring(0, 50) + '...');
-      
-    } catch (error) {
-      console.error('💥 Error fetching AI recommendations:', error);
-      setIsLoadingMitigation(false);
-      setMitigationText('Error al cargar las recomendaciones. Verifica que hayas puesto tu API key de OpenRouter (https://openrouter.ai/keys)');
-    }
-  };
+    `Medidas técnicas para impacto de ${impactCalculations.energy.megatons} megatones:
+    • Estructuras antisísmicas en zona de 30 km
+    • Reservas de emergencia para 72 horas
+    • Protocolos de comunicación satelital
+    • Hospitales de campaña en áreas seguras`,
+    
+    `Protección civil ante cráter de ${impactCalculations.crater.diameter}m:
+    - Zona de exclusión de 5 km del epicentro
+    - Monitoreo de calidad del aire continuo
+    - Equipos de rescate especializados
+    - Albergues temporales resistentes`,
+    
+    `Mitigación para asteroide ${impactData.asteroid?.nombre || 'Desconocido'}:
+    🔴 Evacuación prioritaria en radio 20 km
+    🟡 Refugios en sótanos reforzados
+    🟢 Kit de emergencia por familia
+    🔵 Rutas de escape designadas`,
+    
+    `Recomendaciones técnicas específicas:
+    • Aislamiento de redes eléctricas
+    • Protección de fuentes de agua
+    • Comunicaciones de backup
+    • Equipos de primeros auxilios`,
+    
+    `Plan de respuesta inmediata:
+    1. Activación de protocolo de emergencia
+    2. Evacuación escalonada por zonas
+    3. Puntos de reunión seguros
+    4. Coordinación con defensa civil`,
+    
+    `Medidas estructurales requeridas:
+    - Edificios con norma sísmica superior
+    - Bunkers para protección inmediata
+    - Sistemas de alerta redundantes
+    - Infraestructura crítica blindada`,
+    
+    `Protección poblacional esencial:
+    • Capacitación en procedimientos de evacuación
+    • Simulacros regulares de impacto
+    • Mapeo de zonas de riesgo
+    • Alianzas internacionales de apoyo`,
+    
+    `Estrategia de mitigación técnica:
+    🎯 Monitoreo satelital continuo
+    🎯 Red de sensores sísmicos
+    🎯 Comunicaciones por satélite
+    🎯 Equipos de respuesta rápida`,
+    
+    `Recomendaciones finales de seguridad:
+    - Mantener distancia mínima de 10 km
+    - Usar protección respiratoria
+    - Seguir instrucciones oficiales
+    - Tener plan familiar de emergencia`
+  ];
+  
+  // Seleccionar una recomendación aleatoria
+  const randomIndex = Math.floor(Math.random() * recomendaciones.length);
+  const generatedText = recomendaciones[randomIndex];
+  
+  console.log('✅ Recomendación generada (simulada)');
+  setMitigationText(generatedText);
+  setIsLoadingMitigation(false);
+};
 
   useEffect(() => {
     fetchMitigationRecommendations();
@@ -585,7 +589,10 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData, onBack 
   }, [animationComplete]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+    
+
+
+        <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -593,7 +600,7 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData, onBack 
         }
       `}</style>
 
-      <div style={{
+        <div style={{
         position: 'absolute',
         left: 0,
         top: 0,
@@ -605,7 +612,40 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData, onBack 
         padding: '20px',
         boxShadow: '2px 0 10px rgba(0,0,0,0.3)',
         zIndex: 1000
-      }}>
+      }}>{/* Botón de volver a la página principal */}
+        <div style={{ marginBottom: '20px' }}>
+          <button
+            onClick={() => window.location.href = 'https://crashnasa.earth'}
+            style={{
+              backgroundColor: '#3a0ca3',
+              color: 'white',
+              border: 'none',
+              padding: '12px 20px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+              width: '100%',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#4361ee';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#3a0ca3';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            ← Volver a CrashNASA.Earth
+          </button>
+        </div>
+
         <h1 style={{ 
           fontSize: '24px', 
           fontWeight: 'bold', 
@@ -614,7 +654,6 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData, onBack 
         }}>
           🌠 Simulador de Impacto
         </h1>
-
         <div style={{ marginBottom: '24px' }}>
           <h2 style={{ 
             fontSize: '18px', 
