@@ -11,6 +11,7 @@ import {
   ScreenSpaceEventType,
   VerticalOrigin,
   HorizontalOrigin,
+  HeadingPitchRange
 } from "cesium";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -22,10 +23,67 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
   const viewerRef = useRef<Viewer | null>(null);
   const impactPinRef = useRef<any>(null);
   const [asteroidToCrash, setAsteroidToCrash] = useState<any>(null);
+  const [asteroidsData, setAsteroidsData] = useState<any[]>([]);
+  const [currentDate, setCurrentDate] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
 
-  
+  // Función para formatear la fecha como YYYY-MM-DD
+  const formatDate = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Función para obtener la fecha de hoy
+  const getTodayDate = (): string => {
+    return formatDate(new Date());
+  };
+
+  // Función para cambiar la fecha (días atrás/adelante)
+  const changeDate = (days: number): void => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + days);
+    setCurrentDate(formatDate(newDate));
+  };
+
+  // Función para ir a una fecha específica
+  const goToDate = (dateString: string): void => {
+    setCurrentDate(dateString);
+  };
+
+  // Fetch de datos de asteroides
+const fetchAsteroids = async (date: string) => {
+  setLoading(true);
+  try {
+    const response = await fetch(`https://crash-api-ptq6.onrender.com/previewAsteroid/${date}`);
+    const data = await response.json();
+
+    if (data.asteroides && Array.isArray(data.asteroides)) {
+      console.log('🪐 Asteroides recibidos:', data.asteroides);
+      setAsteroidsData(data.asteroides);
+    } else {
+      console.warn('⚠️ No se encontró un array de asteroides en la respuesta:', data);
+      setAsteroidsData([]);
+    }
+  } catch (error) {
+    console.error('❌ Error fetching asteroids data:', error);
+    setAsteroidsData([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Efecto para cargar datos cuando cambia la fecha
   useEffect(() => {
-    
+    if (currentDate) {
+      fetchAsteroids(currentDate);
+    }
+  }, [currentDate]);
+
+  // Inicializar con la fecha de hoy
+  useEffect(() => {
+    setCurrentDate(getTodayDate());
+  }, []);
+
+  useEffect(() => {
     const cesiumWidgetsCssUrl =
       "https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css";
     const link = document.createElement("link");
@@ -57,73 +115,9 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
       viewer.clock.clockRange = ClockRange.LOOP_STOP;
       viewer.clock.shouldAnimate = true;
 
-      const EARTH_RADIUS = 6371000;
+      viewerRef.current = viewer;
 
-      const createAsteroid = (
-        name: string,
-        color: Color,
-        radius: number,
-        orbitDistance: number,
-        velocityKms: number,
-        inclinationFactor: number
-      ) => {
-        const asteroidPosition = new SampledPositionProperty();
-        const polylinePoints: Cartesian3[] = [];
-        const R = EARTH_RADIUS + orbitDistance;
-
-        const velocityMs = velocityKms * 1000;
-        const circumference = 2 * Math.PI * R;
-        const periodSeconds = circumference / velocityMs;
-        const orbitSpeedFactor = durationSeconds / periodSeconds;
-        const effectiveOrbitSpeed = Math.max(orbitSpeedFactor, 0.1);
-        const inclinationAngle = CesiumMath.toRadians(inclinationFactor * 90);
-
-        for (let i = 0; i <= durationSeconds * effectiveOrbitSpeed; i += 1) {
-          const time = JulianDate.addSeconds(start, i / effectiveOrbitSpeed, new JulianDate());
-          const angle = CesiumMath.toRadians(i * (360 / (durationSeconds * effectiveOrbitSpeed)));
-
-          const x_prime = R * Math.cos(angle);
-          const y_prime = R * Math.sin(angle);
-          const x = x_prime;
-          const y = y_prime * Math.cos(inclinationAngle);
-          const z = y_prime * Math.sin(inclinationAngle);
-
-          const cartesianPosition = new Cartesian3(x, y, z);
-          polylinePoints.push(cartesianPosition);
-          asteroidPosition.addSample(time, cartesianPosition);
-        }
-
-        viewer.entities.add({
-          name: `${name} - Static Orbit`,
-          polyline: {
-            positions: polylinePoints,
-            width: 4,
-            material: color.withAlpha(0.2),
-            clampToGround: false,
-          },
-        });
-
-        return viewer.entities.add({
-          name,
-          position: asteroidPosition,
-          model: {
-            uri: "/meteorite.glb",
-            scale: radius,
-          },
-          path: {
-            resolution: 120,
-            width: 2,
-            material: color.withAlpha(0.4),
-            trailTime: 60,
-          },
-        });
-      };
-
-      createAsteroid("Rocinante (Low)", Color.WHITE, 50000, 1500000, 7.0, 0.3);
-      createAsteroid("Pallas (Mid)", Color.WHITE, 80000, 5000000, 5.5, 0.6);
-      createAsteroid("Vesta (High)", Color.WHITE, 100000, 10000000, 4.0, 0.9);
-
-      viewer.flyTo(viewer.entities, { duration: 4.0 });
+      // Configurar la cámara
       viewer.camera.setView({
         destination: Cartesian3.fromDegrees(-90.0, 45.0, 50000000.0),
         orientation: {
@@ -140,8 +134,6 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
           setSelectedAsteroid(null);
         }
       });
-
-      viewerRef.current = viewer;
     }
 
     return () => {
@@ -152,11 +144,163 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
     };
   }, []);
 
+  // Efecto para crear/actualizar asteroides cuando cambian los datos
+  useEffect(() => {
+    if (!viewerRef.current || loading) return;
+
+    const viewer = viewerRef.current;
+    
+    // Limpiar asteroides existentes
+    viewer.entities.removeAll();
+
+    const EARTH_RADIUS = 6371000;
+
+    const createAsteroid = (
+      asteroid: any,
+      color: Color,
+      scaleFactor: number = 1.0
+    ) => {
+      const asteroidPosition = new SampledPositionProperty();
+      const polylinePoints: Cartesian3[] = [];
+      
+      // Aumentar la distancia mínima de los asteroides a la Tierra
+      const alturaReal = asteroid.altura_tierra_m || 0;
+      const alturaKm = alturaReal / 1000;
+      
+      // Escalar más agresivamente para separar los asteroides
+      const alturaEscalada = Math.log10(alturaKm + 100) * 200000;
+      const R = EARTH_RADIUS + alturaEscalada;
+
+      console.log(`🪐 Creando asteroide: ${asteroid.nombre}`);
+      console.log(`   Altura real: ${alturaKm.toFixed(2)} km`);
+      console.log(`   Altura escalada: ${(alturaEscalada / 1000).toFixed(2)} km`);
+      console.log(`   Radio orbital: ${(R / 1000).toFixed(2)} km`);
+
+      const velocityMs = asteroid.velocidad_km_s * 1000;
+      const circumference = 2 * Math.PI * R;
+      const durationSeconds = 360;
+      const periodSeconds = circumference / velocityMs;
+      const orbitSpeedFactor = durationSeconds / periodSeconds;
+      const effectiveOrbitSpeed = Math.max(orbitSpeedFactor, 0.1);
+      
+      // Generar diferentes inclinaciones para variedad visual
+      let inclinationAngle = asteroid.inclinacion;
+      if (!inclinationAngle || inclinationAngle === 0) {
+        // Generar inclinaciones entre -60° y 60° para variedad
+        inclinationAngle = CesiumMath.toRadians((Math.random() * 120) - 60);
+      } else {
+        // Asegurar que la inclinación sea visible (mínimo 10°)
+        const minInclination = CesiumMath.toRadians(10);
+        if (Math.abs(inclinationAngle) < minInclination) {
+          inclinationAngle = inclinationAngle > 0 ? minInclination : -minInclination;
+        }
+      }
+
+      // 🎯 CORRECCIÓN PRINCIPAL: Generar un ángulo inicial aleatorio para cada asteroide
+      // Esto evita que todos empiecen desde el mismo punto
+      const startAngle = Math.random() * 2 * Math.PI; // Ángulo inicial aleatorio entre 0 y 2π
+
+      const start = JulianDate.now();
+
+      for (let i = 0; i <= durationSeconds * effectiveOrbitSpeed; i += 1) {
+        const time = JulianDate.addSeconds(start, i / effectiveOrbitSpeed, new JulianDate());
+        
+        // 🎯 USAR EL ÁNGULO INICIAL ALEATORIO + el ángulo de progreso
+        const angle = startAngle + CesiumMath.toRadians(i * (360 / (durationSeconds * effectiveOrbitSpeed)));
+
+        const x_prime = R * Math.cos(angle);
+        const y_prime = R * Math.sin(angle);
+        const x = x_prime;
+        const y = y_prime * Math.cos(inclinationAngle);
+        const z = y_prime * Math.sin(inclinationAngle);
+
+        const cartesianPosition = new Cartesian3(x, y, z);
+        polylinePoints.push(cartesianPosition);
+        asteroidPosition.addSample(time, cartesianPosition);
+      }
+
+      // Calcular escala basada en el diámetro
+      const diameter = asteroid.diametro_promedio_m;
+      const baseScale = Math.max(diameter / 100, 50);
+      const scale = baseScale * scaleFactor;
+
+      console.log(`   Diámetro: ${diameter.toFixed(2)} m, Escala: ${scale.toFixed(2)}`);
+      console.log(`   Ángulo inicial: ${CesiumMath.toDegrees(startAngle).toFixed(2)}°`);
+
+      // Entidad de la órbita
+      viewer.entities.add({
+        name: `${asteroid.nombre} - Static Orbit`,
+        polyline: {
+          positions: polylinePoints,
+          width: 2,
+          material: color.withAlpha(0.2),
+          clampToGround: false,
+        },
+      });
+
+      // Entidad del asteroide
+      return viewer.entities.add({
+        name: asteroid.nombre,
+        description: `
+          <strong>${asteroid.nombre}</strong><br/>
+          ID: ${asteroid.id}<br/>
+          Diámetro: ${diameter.toFixed(2)} m<br/>
+          Velocidad: ${asteroid.velocidad_km_s.toFixed(2)} km/s<br/>
+          Altura: ${(asteroid.altura_tierra_m / 1000).toFixed(2)} km<br/>
+          Inclinación: ${inclinationAngle.toFixed(4)} rad (${CesiumMath.toDegrees(inclinationAngle).toFixed(2)}°)<br/>
+          Posición inicial: ${CesiumMath.toDegrees(startAngle).toFixed(2)}°
+        `,
+        position: asteroidPosition,
+        model: {
+          uri: "/meteorite.glb",
+          scale: scale,
+          minimumPixelSize: 32,
+          maximumScale: 20000,
+        },
+        path: {
+          resolution: 120,
+          width: 1,
+          material: color.withAlpha(0.4),
+          trailTime: 60,
+        },
+      });
+    };
+
+    // Crear asteroides con datos de la API
+    asteroidsData.forEach((asteroid, index) => {
+      // Asignar colores diferentes basados en el índice
+      const colors = [
+        Color.YELLOW,
+        Color.ORANGE,
+        Color.RED,
+        Color.GREEN,
+        Color.BLUE,
+        Color.VIOLET,
+        Color.CYAN,
+        Color.MAGENTA,
+        Color.GOLD,
+        Color.CORAL
+      ];
+      const color = colors[index % colors.length];
+      
+      createAsteroid(asteroid, color, 0.5);
+    });
+
+    // Volar a los asteroides
+    if (asteroidsData.length > 0) {
+      viewer.flyTo(viewer.entities, { 
+        duration: 2.0,
+        offset: new HeadingPitchRange(0, CesiumMath.toRadians(-70), 10000000)
+      });
+    }
+
+  }, [asteroidsData, loading]);
+
+  // ... (el resto del código permanece igual)
   useEffect(() => {
     if (!viewerRef.current || !isSelectingImpact) return;
 
     const viewer = viewerRef.current;
-
     const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
 
     handler.setInputAction((click: any) => {
@@ -170,7 +314,7 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
         impactPinRef.current = viewer.entities.add({
           position: pickedPosition,
           billboard: {
-            image: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIxMiIgZmlsbD0iI2RjMjYyNiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgPGNpcmNsZSBjeD0iMjQiIGN5PSIyNCIgcj0iNCIgZmlsbD0id2hpdGUiLz4KPC9zdmc+",
+            image: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0giIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPGNpcmNsZSBjeD0iMjQiIGN5PSIyNCIgcj0iMTIiIGZpbGw9IiNkYzI2MjYiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMyIvPgogIDxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjQiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPg==",
             width: 48,
             height: 48,
             verticalOrigin: VerticalOrigin.CENTER,
@@ -188,9 +332,9 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
   }, [isSelectingImpact]);
 
   const handleCrashClick = () => {
-  setAsteroidToCrash(selectedAsteroid); // ← rescate
-  setIsSelectingImpact(true);
-};
+    setAsteroidToCrash(selectedAsteroid);
+    setIsSelectingImpact(true);
+  };
 
   const handleCancel = () => {
     setIsSelectingImpact(false);
@@ -202,12 +346,12 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
   };
 
   const handleConfirm = () => {
-  if (!impactPoint || !asteroidToCrash) return;
+    if (!impactPoint || !asteroidToCrash) return;
 
-  alert("¡Impacto confirmado! Iniciando animación...");
-  onConfirm(); // 👈 Aquí notificas al padre
-  handleCancel();
-};
+    alert("¡Impacto confirmado! Iniciando animación...");
+    onConfirm();
+    handleCancel();
+  };
 
   return (
     <>
@@ -217,6 +361,72 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
           height: 100vh;
           position: relative;
         }
+        
+        .date-controls {
+          position: fixed;
+          top: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background-color: rgba(0, 0, 0, 0.85);
+          color: white;
+          padding: 16px 24px;
+          border-radius: 10px;
+          font-size: 16px;
+          font-weight: 600;
+          z-index: 9999;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .date-button {
+          background-color: #3b82f6;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: background-color 0.2s;
+        }
+
+        .date-button:hover {
+          background-color: #2563eb;
+        }
+
+        .date-button:disabled {
+          background-color: #6b7280;
+          cursor: not-allowed;
+        }
+
+        .date-display {
+          margin: 0 12px;
+          font-size: 14px;
+        }
+
+        .date-input {
+          background-color: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 14px;
+        }
+
+        .loading-indicator {
+          position: fixed;
+          top: 80px;
+          left: 50%;
+          transform: translateX(-50%);
+          background-color: rgba(0, 0, 0, 0.85);
+          color: white;
+          padding: 12px 24px;
+          border-radius: 10px;
+          font-size: 14px;
+          z-index: 9999;
+        }
+
         .crash-button {
           position: fixed;
           bottom: 40px;
@@ -238,6 +448,12 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
         .crash-button:hover {
           background-color: #b91c1c;
           transform: translateX(-50%) scale(1.05);
+        }
+
+        .crash-button:disabled {
+          background-color: #6b7280;
+          cursor: not-allowed;
+          transform: translateX(-50%) scale(1);
         }
 
         .impact-controls {
@@ -291,7 +507,7 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
 
         .instruction-banner {
           position: fixed;
-          top: 20px;
+          top: 80px;
           left: 50%;
           transform: translateX(-50%);
           background-color: rgba(0, 0, 0, 0.85);
@@ -307,6 +523,51 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
 
       <div ref={cesiumContainer} className="cesium-container" />
 
+      {/* Controles de fecha */}
+      <div className="date-controls">
+        <button 
+          className="date-button" 
+          onClick={() => changeDate(-1)}
+          disabled={loading}
+        >
+          ← Ayer
+        </button>
+        
+        <span className="date-display">
+          {currentDate} {loading && "(Cargando...)"}
+        </span>
+        
+        <button 
+          className="date-button" 
+          onClick={() => changeDate(1)}
+          disabled={loading}
+        >
+          Mañana →
+        </button>
+        
+        <input
+          type="date"
+          className="date-input"
+          value={currentDate}
+          onChange={(e) => goToDate(e.target.value)}
+          disabled={loading}
+        />
+        
+        <button 
+          className="date-button" 
+          onClick={() => goToDate(getTodayDate())}
+          disabled={loading}
+        >
+          Hoy
+        </button>
+      </div>
+
+      {loading && (
+        <div className="loading-indicator">
+          ⏳ Cargando asteroides para {currentDate}...
+        </div>
+      )}
+
       {isSelectingImpact && (
         <div className="instruction-banner">
           🎯 Haz clic en el globo para seleccionar el punto de impacto
@@ -314,7 +575,11 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
       )}
 
       {!isSelectingImpact && selectedAsteroid && (
-        <button className="crash-button" onClick={handleCrashClick}>
+        <button 
+          className="crash-button" 
+          onClick={handleCrashClick}
+          disabled={loading}
+        >
           🚀 CRASH
         </button>
       )}
