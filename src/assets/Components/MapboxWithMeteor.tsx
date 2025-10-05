@@ -51,20 +51,11 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
       bearing: -20
     });
 
-    mapRef.current.on('load', () => {
-      // Agregar marcador de impacto (después de la animación)
-      if (animationComplete) {
-        new mapboxgl.Marker({ color: '#ff0000', scale: 1.5 })
-          .setLngLat([impactData.lon, impactData.lat])
-          .addTo(mapRef.current!);
-      }
-    });
-
     return () => {
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [impactData, animationComplete]);
+  }, [impactData]);
 
   // Mostrar cráter después de la animación
   useEffect(() => {
@@ -477,10 +468,19 @@ const MapboxWithMeteor: React.FC<MapboxWithMeteorProps> = ({ impactData }) => {
             shakeFrames--;
             requestAnimationFrame(shakeCamera);
           } else {
+            // Asegurarse de que el mapa sea visible antes de limpiar
             setTimeout(() => {
               setAnimationComplete(true);
               if (container && renderer.domElement.parentNode === container) {
-                container.removeChild(renderer.domElement);
+                try {
+                  container.removeChild(renderer.domElement);
+                } catch (e) {
+                  console.warn('Error removing renderer:', e);
+                }
+              }
+              // Forzar resize del mapa para asegurar que se muestre
+              if (mapRef.current) {
+                mapRef.current.resize();
               }
             }, 1500);
           }
