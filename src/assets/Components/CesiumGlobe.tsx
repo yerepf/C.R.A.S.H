@@ -1,6 +1,8 @@
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Viewer,
   Cartesian3,
+  Cartesian2,
   Color,
   JulianDate,
   SampledPositionProperty,
@@ -11,11 +13,22 @@ import {
   ScreenSpaceEventType,
   VerticalOrigin,
   HorizontalOrigin,
-  HeadingPitchRange
+  HeadingPitchRange,
+  DistanceDisplayCondition,
+  NearFarScalar,
+  Cartographic
 } from "cesium";
-import React, { useEffect, useRef, useState } from "react";
 
-const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
+interface ImpactData {
+  lat: number;
+  lon: number;
+  position: Cartesian3;
+  asteroid: any;
+}
+
+const CesiumGlobe: React.FC<{ 
+  onConfirm: (impactData: ImpactData) => void 
+}> = ({ onConfirm }) => {
   const cesiumContainer = useRef<HTMLDivElement>(null);
   const [selectedAsteroid, setSelectedAsteroid] = useState<any>(null);
   const [isSelectingImpact, setIsSelectingImpact] = useState(false);
@@ -27,58 +40,51 @@ const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
   const [currentDate, setCurrentDate] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Función para formatear la fecha como YYYY-MM-DD
   const formatDate = (date: Date): string => {
     return date.toISOString().split('T')[0];
   };
 
-  // Función para obtener la fecha de hoy
   const getTodayDate = (): string => {
     return formatDate(new Date());
   };
 
-  // Función para cambiar la fecha (días atrás/adelante)
   const changeDate = (days: number): void => {
     const newDate = new Date(currentDate);
     newDate.setDate(newDate.getDate() + days);
     setCurrentDate(formatDate(newDate));
   };
 
-  // Función para ir a una fecha específica
   const goToDate = (dateString: string): void => {
     setCurrentDate(dateString);
   };
 
-  // Fetch de datos de asteroides
-const fetchAsteroids = async (date: string) => {
-  setLoading(true);
-  try {
-    const response = await fetch(`https://crash-api-ptq6.onrender.com/previewAsteroid/${date}`);
-    const data = await response.json();
+  const fetchAsteroids = async (date: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`https://crash-api-ptq6.onrender.com/previewAsteroid/${date}`);
+      const data = await response.json();
 
-    if (data.asteroides && Array.isArray(data.asteroides)) {
-      console.log('🪐 Asteroides recibidos:', data.asteroides);
-      setAsteroidsData(data.asteroides);
-    } else {
-      console.warn('⚠️ No se encontró un array de asteroides en la respuesta:', data);
+      if (data.asteroides && Array.isArray(data.asteroides)) {
+        console.log('🪐 Asteroides recibidos:', data.asteroides);
+        setAsteroidsData(data.asteroides);
+      } else {
+        console.warn('⚠️ No se encontró un array de asteroides en la respuesta:', data);
+        setAsteroidsData([]);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching asteroids data:', error);
       setAsteroidsData([]);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('❌ Error fetching asteroids data:', error);
-    setAsteroidsData([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-  // Efecto para cargar datos cuando cambia la fecha
   useEffect(() => {
     if (currentDate) {
       fetchAsteroids(currentDate);
     }
   }, [currentDate]);
 
-  // Inicializar con la fecha de hoy
   useEffect(() => {
     setCurrentDate(getTodayDate());
   }, []);
@@ -117,7 +123,6 @@ const fetchAsteroids = async (date: string) => {
 
       viewerRef.current = viewer;
 
-      // Configurar la cámara
       viewer.camera.setView({
         destination: Cartesian3.fromDegrees(-90.0, 45.0, 50000000.0),
         orientation: {
@@ -144,13 +149,10 @@ const fetchAsteroids = async (date: string) => {
     };
   }, []);
 
-  // Efecto para crear/actualizar asteroides cuando cambian los datos
   useEffect(() => {
     if (!viewerRef.current || loading) return;
 
     const viewer = viewerRef.current;
-    
-    // Limpiar asteroides existentes
     viewer.entities.removeAll();
 
     const EARTH_RADIUS = 6371000;
@@ -163,11 +165,8 @@ const fetchAsteroids = async (date: string) => {
       const asteroidPosition = new SampledPositionProperty();
       const polylinePoints: Cartesian3[] = [];
       
-      // Aumentar la distancia mínima de los asteroides a la Tierra
       const alturaReal = asteroid.altura_tierra_m || 0;
       const alturaKm = alturaReal / 1000;
-      
-      // Escalar más agresivamente para separar los asteroides
       const alturaEscalada = Math.log10(alturaKm + 100) * 200000;
       const R = EARTH_RADIUS + alturaEscalada;
 
@@ -183,29 +182,21 @@ const fetchAsteroids = async (date: string) => {
       const orbitSpeedFactor = durationSeconds / periodSeconds;
       const effectiveOrbitSpeed = Math.max(orbitSpeedFactor, 0.1);
       
-      // Generar diferentes inclinaciones para variedad visual
       let inclinationAngle = asteroid.inclinacion;
       if (!inclinationAngle || inclinationAngle === 0) {
-        // Generar inclinaciones entre -60° y 60° para variedad
         inclinationAngle = CesiumMath.toRadians((Math.random() * 120) - 60);
       } else {
-        // Asegurar que la inclinación sea visible (mínimo 10°)
         const minInclination = CesiumMath.toRadians(10);
         if (Math.abs(inclinationAngle) < minInclination) {
           inclinationAngle = inclinationAngle > 0 ? minInclination : -minInclination;
         }
       }
 
-      // 🎯 CORRECCIÓN PRINCIPAL: Generar un ángulo inicial aleatorio para cada asteroide
-      // Esto evita que todos empiecen desde el mismo punto
-      const startAngle = Math.random() * 2 * Math.PI; // Ángulo inicial aleatorio entre 0 y 2π
-
+      const startAngle = Math.random() * 2 * Math.PI;
       const start = JulianDate.now();
 
       for (let i = 0; i <= durationSeconds * effectiveOrbitSpeed; i += 1) {
         const time = JulianDate.addSeconds(start, i / effectiveOrbitSpeed, new JulianDate());
-        
-        // 🎯 USAR EL ÁNGULO INICIAL ALEATORIO + el ángulo de progreso
         const angle = startAngle + CesiumMath.toRadians(i * (360 / (durationSeconds * effectiveOrbitSpeed)));
 
         const x_prime = R * Math.cos(angle);
@@ -219,7 +210,6 @@ const fetchAsteroids = async (date: string) => {
         asteroidPosition.addSample(time, cartesianPosition);
       }
 
-      // Calcular escala basada en el diámetro
       const diameter = asteroid.diametro_promedio_m;
       const baseScale = Math.max(diameter / 100, 50);
       const scale = baseScale * scaleFactor;
@@ -227,7 +217,6 @@ const fetchAsteroids = async (date: string) => {
       console.log(`   Diámetro: ${diameter.toFixed(2)} m, Escala: ${scale.toFixed(2)}`);
       console.log(`   Ángulo inicial: ${CesiumMath.toDegrees(startAngle).toFixed(2)}°`);
 
-      // Entidad de la órbita
       viewer.entities.add({
         name: `${asteroid.nombre} - Static Orbit`,
         polyline: {
@@ -238,7 +227,6 @@ const fetchAsteroids = async (date: string) => {
         },
       });
 
-      // Entidad del asteroide
       return viewer.entities.add({
         name: asteroid.nombre,
         description: `
@@ -263,12 +251,30 @@ const fetchAsteroids = async (date: string) => {
           material: color.withAlpha(0.4),
           trailTime: 60,
         },
+        label: {
+          text: asteroid.nombre,
+          font: "bold 14pt 'Segoe UI', sans-serif",
+          fillColor: Color.WHITE,
+          outlineColor: Color.BLACK,
+          outlineWidth: 3,
+          pixelOffset: new Cartesian2(0, -50),
+          verticalOrigin: VerticalOrigin.BOTTOM,
+          horizontalOrigin: HorizontalOrigin.CENTER,
+          showBackground: true,
+          backgroundColor: new Color(0.0, 0.0, 0.0, 0.8),
+          backgroundPadding: new Cartesian2(10, 6),
+          scale: 1.0,
+          distanceDisplayCondition: new DistanceDisplayCondition(0, 50000000),
+          scaleByDistance: new NearFarScalar(1000000, 1.0, 10000000, 0.5),
+          translucencyByDistance: new NearFarScalar(1000000, 1.0, 10000000, 0.3),
+        },
+        properties: {
+          asteroidData: asteroid
+        }
       });
     };
 
-    // Crear asteroides con datos de la API
     asteroidsData.forEach((asteroid, index) => {
-      // Asignar colores diferentes basados en el índice
       const colors = [
         Color.YELLOW,
         Color.ORANGE,
@@ -282,11 +288,9 @@ const fetchAsteroids = async (date: string) => {
         Color.CORAL
       ];
       const color = colors[index % colors.length];
-      
       createAsteroid(asteroid, color, 0.5);
     });
 
-    // Volar a los asteroides
     if (asteroidsData.length > 0) {
       viewer.flyTo(viewer.entities, { 
         duration: 2.0,
@@ -296,7 +300,6 @@ const fetchAsteroids = async (date: string) => {
 
   }, [asteroidsData, loading]);
 
-  // ... (el resto del código permanece igual)
   useEffect(() => {
     if (!viewerRef.current || !isSelectingImpact) return;
 
@@ -347,7 +350,31 @@ const fetchAsteroids = async (date: string) => {
 
   const handleConfirm = () => {
     if (!impactPoint || !asteroidToCrash) return;
-    onConfirm();
+
+    const cartographic = Cartographic.fromCartesian(impactPoint);
+    const longitude = CesiumMath.toDegrees(cartographic.longitude);
+    const latitude = CesiumMath.toDegrees(cartographic.latitude);
+
+    console.log('📍 Coordenadas del impacto:', {
+      lat: latitude,
+      lon: longitude,
+      height: cartographic.height
+    });
+
+    // Obtener los datos del asteroide desde las properties
+    const asteroidData = asteroidToCrash.properties?.asteroidData?._value || {
+      nombre: asteroidToCrash.name,
+      diametro_promedio_m: 340,
+      velocidad_km_s: 18.5
+    };
+
+    onConfirm({
+      lat: latitude,
+      lon: longitude,
+      position: impactPoint,
+      asteroid: asteroidData
+    });
+    
     handleCancel();
   };
 
@@ -521,7 +548,6 @@ const fetchAsteroids = async (date: string) => {
 
       <div ref={cesiumContainer} className="cesium-container" />
 
-      {/* Controles de fecha */}
       <div className="date-controls">
         <button 
           className="date-button" 
