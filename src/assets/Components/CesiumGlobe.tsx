@@ -31,6 +31,7 @@ const CesiumGlobe: React.FC = () => {
         infoBox: true,
         skyAtmosphere: false,
         skyBox: false,
+        creditContainer: document.createElement("div")
       });
 
       viewer.scene.logarithmicDepthBuffer = true;
@@ -148,26 +149,28 @@ const CesiumGlobe: React.FC = () => {
           position: relative;
         }
         .crash-button {
-          position: fixed;
-          bottom: 40px;
-          left: 50%;
-          transform: translateX(-50%);
-          background-color: #dc2626;
-          color: white;
-          padding: 16px 32px;
-          font-size: 24px;
-          font-weight: bold;
-          border-radius: 12px;
-          border: none;
-          cursor: pointer;
-          z-index: 9999;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          transition: transform 0.2s, background-color 0.2s;
-        }
-        .crash-button:hover {
-          background-color: #b91c1c;
-          transform: scale(1.05);
-        }
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) scale(1);
+  background-color: #dc2626;
+  color: white;
+  padding: 16px 32px;
+  font-size: 24px;
+  font-weight: bold;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.crash-button:hover {
+  background-color: #b91c1c;
+  transform: translateX(-50%) scale(1.05); /* ✅ mantener translateX */
+}
+
       `}</style>
 
       <div ref={cesiumContainer} className="cesium-container" />
