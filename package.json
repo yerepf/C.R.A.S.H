@@ -12,8 +12,10 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "cesium": "^1.134.0",
+    "framer-motion": "^12.23.22",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "satellite.js": "^6.0.1",
     "tailwindcss": "^4.1.14"
   },
   "devDependencies": {
