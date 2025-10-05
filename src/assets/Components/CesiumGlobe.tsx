@@ -314,7 +314,7 @@ const fetchAsteroids = async (date: string) => {
         impactPinRef.current = viewer.entities.add({
           position: pickedPosition,
           billboard: {
-            image: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0giIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPGNpcmNsZSBjeD0iMjQiIGN5PSIyNCIgcj0iMTIiIGZpbGw9IiNkYzI2MjYiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMyIvPgogIDxjaXJjbGUgY3g9IjI0IiBjeT0iMjQiIHI9IjQiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPg==",
+            image: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
             width: 48,
             height: 48,
             verticalOrigin: VerticalOrigin.CENTER,
@@ -347,8 +347,6 @@ const fetchAsteroids = async (date: string) => {
 
   const handleConfirm = () => {
     if (!impactPoint || !asteroidToCrash) return;
-
-    alert("¡Impacto confirmado! Iniciando animación...");
     onConfirm();
     handleCancel();
   };
