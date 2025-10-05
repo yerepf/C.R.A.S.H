@@ -14,15 +14,18 @@ import {
 } from "cesium";
 import React, { useEffect, useRef, useState } from "react";
 
-const CesiumGlobe: React.FC = () => {
+const CesiumGlobe: React.FC<{ onConfirm: () => void }> = ({ onConfirm }) => {
   const cesiumContainer = useRef<HTMLDivElement>(null);
   const [selectedAsteroid, setSelectedAsteroid] = useState<any>(null);
   const [isSelectingImpact, setIsSelectingImpact] = useState(false);
   const [impactPoint, setImpactPoint] = useState<any>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const impactPinRef = useRef<any>(null);
+  const [asteroidToCrash, setAsteroidToCrash] = useState<any>(null);
 
+  
   useEffect(() => {
+    
     const cesiumWidgetsCssUrl =
       "https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css";
     const link = document.createElement("link");
@@ -185,8 +188,9 @@ const CesiumGlobe: React.FC = () => {
   }, [isSelectingImpact]);
 
   const handleCrashClick = () => {
-    setIsSelectingImpact(true);
-  };
+  setAsteroidToCrash(selectedAsteroid); // ← rescate
+  setIsSelectingImpact(true);
+};
 
   const handleCancel = () => {
     setIsSelectingImpact(false);
@@ -198,11 +202,12 @@ const CesiumGlobe: React.FC = () => {
   };
 
   const handleConfirm = () => {
-    if (impactPoint && selectedAsteroid) {
-      window.alert(`💥 ¡${selectedAsteroid.name} impactó en las coordenadas seleccionadas!`);
-      handleCancel();
-    }
-  };
+  if (!impactPoint || !asteroidToCrash) return;
+
+  alert("¡Impacto confirmado! Iniciando animación...");
+  onConfirm(); // 👈 Aquí notificas al padre
+  handleCancel();
+};
 
   return (
     <>
