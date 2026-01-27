@@ -17,7 +17,6 @@ import {
   DistanceDisplayCondition,
   NearFarScalar,
   Cartographic,
-  ImageryLayer,
   OpenStreetMapImageryProvider
 } from "cesium";
 
