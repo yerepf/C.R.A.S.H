@@ -16,7 +16,9 @@ import {
   HeadingPitchRange,
   DistanceDisplayCondition,
   NearFarScalar,
-  Cartographic
+  Cartographic,
+  ImageryLayer,
+  OpenStreetMapImageryProvider
 } from "cesium";
 
 interface ImpactData {
@@ -106,11 +108,24 @@ const CesiumGlobe: React.FC<{
         creditContainer: document.createElement("div"),
         infoBox: false,
         selectionIndicator: false,
+        geocoder: false,
+        homeButton: false,
+        baseLayerPicker: false,
+        sceneModePicker: false,
+        navigationHelpButton: false,
+        fullscreenButton: false,
       });
 
       viewer.scene.logarithmicDepthBuffer = true;
       viewer.scene.mode = SceneMode.SCENE3D;
       viewer.scene.globe.depthTestAgainstTerrain = false;
+      
+      // Add imagery layer to display the globe
+      viewer.imageryLayers.addImageryProvider(
+        new OpenStreetMapImageryProvider({
+          url: 'https://a.tile.openstreetmap.org/'
+        })
+      );
 
       const durationSeconds = 360;
       const start = JulianDate.now();
