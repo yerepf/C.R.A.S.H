@@ -62,7 +62,7 @@ const CesiumGlobe: React.FC<{
   const fetchAsteroids = async (date: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`https://crash-api-ptq6.onrender.com/previewAsteroid/${date}`);
+      const response = await fetch(`https://backend.crashnasa.earth/previewAsteroid/${date}`);
       const data = await response.json();
 
       if (data.asteroides && Array.isArray(data.asteroides)) {
