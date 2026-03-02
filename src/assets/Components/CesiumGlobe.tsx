@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Ion } from "cesium";
+Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_TOKEN || "";
 import {
   Viewer,
   Cartesian3,
