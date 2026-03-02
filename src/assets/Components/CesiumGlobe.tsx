@@ -19,7 +19,7 @@ import {
   DistanceDisplayCondition,
   NearFarScalar,
   Cartographic,
-  OpenStreetMapImageryProvider
+
 } from "cesium";
 
 interface ImpactData {
