@@ -121,12 +121,11 @@ const CesiumGlobe: React.FC<{
       viewer.scene.mode = SceneMode.SCENE3D;
       viewer.scene.globe.depthTestAgainstTerrain = false;
       
-      // Add imagery layer to display the globe
-      viewer.imageryLayers.addImageryProvider(
-        new OpenStreetMapImageryProvider({
-          url: 'https://a.tile.openstreetmap.org/'
-        })
-      );
+      // Usar la World Imagery oficial de Cesium Ion si el token está correctamente configurado
+      import('cesium').then(async Cesium => {
+        const ionLayer = await Cesium.IonImageryProvider.fromAssetId(2);
+        viewer.imageryLayers.addImageryProvider(ionLayer);
+      });
 
       const durationSeconds = 360;
       const start = JulianDate.now();
