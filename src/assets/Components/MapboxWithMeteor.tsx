@@ -124,7 +124,8 @@ const fetchMitigationRecommendations = async () => {
   useEffect(() => {
     if (mapRef.current || !mapContainerRef.current) return;
 
-    mapboxgl.accessToken = 'pk.eyJ1IjoieWVyZXBmIiwiYSI6ImNtZzVhcmFxczAyczMybHB4NzluOGd0bDIifQ.D7eY77KyGHtkQZ96gliXvA';
+    // mapboxgl.accessToken = process.env.VITE_MAPBOX_TOKEN || ''; // moved to env variable
+mapboxgl.accessToken = '' // <---- CLEANED BEFORE PUBLIC RELEASE
 
     mapRef.current = new mapboxgl.Map({
       container: mapContainerRef.current,
