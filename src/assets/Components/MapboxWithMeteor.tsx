@@ -615,7 +615,7 @@ const fetchMitigationRecommendations = async () => {
       }}>{/* Botón de volver a la página principal */}
         <div style={{ marginBottom: '20px' }}>
           <button
-            onClick={() => window.location.href = 'https://crashnasa.earth'}
+            onClick={() => window.location.href = 'https://crashnasa.vercel.app'}
             style={{
               backgroundColor: '#3a0ca3',
               color: 'white',
